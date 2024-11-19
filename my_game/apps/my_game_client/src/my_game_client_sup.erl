@@ -1,4 +1,4 @@
--module(my_game_sup).
+-module(my_game_client_sup).
 
 -behaviour(supervisor).
 
