@@ -2,16 +2,16 @@
 
 ## Description
 
-"My Game" is an Erlang application that demonstrates the basic client-server interaction with TCP connections. The project includes two main components:
+"My Game" is a simple client-server application written in Erlang that demonstrates basic interaction using TCP connections. The project consists of two main components:
 
-- **Server (`my_game_app`)**: A multi-client server that can accept multiple concurrent connections, manage game interactions, and respond to client commands.
-  
-- **Client (`my_game_client`)**: A client application to connect to the server, send user name, and receive responses.
+- **Server (`my_game_app`)**: Handles multiple client connections and manages user interactions such as room creation, deletion, and messaging.
+- **Client (`my_game_client`)**: Connects to the server, allowing users to interact by creating rooms, joining them, and sending messages to other participants.
 
-### Features:
-- The server accepts multiple simultaneous connections from different clients.
-- The client sends its name to the server and receives a personalized welcome message.
-- The client can send commands such as 'quit' to exit the game.
+### Features
+- **Multi-client support**: The server handles multiple simultaneous connections.
+- **Room management**: Clients can create, list, delete, join, and leave chat rooms.
+- **Broadcast messaging**: Messages can be sent to all users in a room.
+- **Graceful disconnection**: Clients can quit cleanly, ensuring server resources are released.
 
 ## Build, Compilation and Test Instructions
 
@@ -77,41 +77,56 @@
    cd  <root-folder>/my_game/_build/default/rel/my_game_client/bin
    .\my_game_client console -sname client_node -setcookie mygame
 
-3. Once inside the Erlang server shell, start the tcp server using my_game_app:start_tcp_server([PORT])
+3. Once inside the Erlang server shell, start the tcp server using my_game_app:start() :
 
-   1> my_game_app:start_tcp_server(4000).
+   1> my_game_app:start().
    
    You should see a message like: 
    
-   Server listening on port 5000
+   Server listening on port 4000
    
-4. Once inside the Erlang client shell, connect to server using my_game_client:start(), then enter your name and then type quit to close the connection:
+4. Once inside the Erlang client shell, connect to server using my_game_client:start(), then enter your name:
 
    1> my_game_client:start().
    
    You should see a message like: 
    
-   2> my_game_client:start().
    Connected to the server!
-   Server says: Welcome in this game! Please enter your name:
-   > Tommaso
-   Server says: Hello Tommaso! You are now connected to the game!
-   There's nothing left to do here, please type 'quit' to exit : > quit
-   Exiting the game, see you soon...
-   ok
+   [SERVER] : Welcome in this game! Please enter your name:
+   >Tommaso                                                                                                                                                                                                 
+   [SERVER] : Hello Tommaso! You are now connected to the game!
+   AVAILABLE ACTIONS :
+   - create_room [room name] to create a room
+   - list_rooms to see the available rooms
+   - join_room [room name] to join a room
+   - delete_room [room name] to delete a room where you are the creator
+   - send_message [room name] [message] to send a message to all the active users in the room
+
+   > join_room tommaso_room                                                                                                                                                                                     
+   [SERVER] : You joined the room 'tommaso_room' successfully.
+
+   > send_message tommaso_room Hello everybody! 
+
+   [SERVER] : Message sent to all users in the room 'tommaso_room'.
+
+   [BROADCAST MESSAGE IN ROOM [tommaso_room] FROM [martina]]: Hello Tommaso, i am Martina!
+
+   > send_message tommaso_room Hello Martina, nice to meet you!  
+
+   [SERVER] : Message sent to all users in the room 'tommaso_room'.
 
 ---
 
 ## Functions
-### start_tcp_server/1
--This function start the server on a given port as parameter
+### start/0 (my_game_app)
+-This function start the server on a default port
 Example:
-my_game_app:start_tcp_server(4000).
+my_game_app:start().
 Result: 
-Server listening on port 5000
+Server listening on port 4000
 
-### start/0
--This function start the connection between a client and the server, and then a conversation will start between them
+### start/0 (my_game_client)
+-This function start the connection between a client and the server, after the presentation from the client, the server list all the available actions
 Example:
 my_game_client:start(). 
 Result: 
