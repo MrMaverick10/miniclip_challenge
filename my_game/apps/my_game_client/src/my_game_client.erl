@@ -24,11 +24,12 @@ start() ->
         io:format("[SERVER] : ~s~n", [Response]),
 
         interact_with_server(Socket,PollingPid)
+        
         catch
           error:Reason ->
               io:format("Error occurred while trying to connect: ~p~n", [Reason]);
           
-          exit:Timeout ->
+          exit:_Timeout ->
               io:format("Connection attempt timed out after 5 seconds.~n")
         end.
 
@@ -44,9 +45,9 @@ poll(Socket) ->
             case gen_tcp:recv(Socket, 0, 0) of
                 {ok, Data} ->
                     io:format("~s", [binary:bin_to_list(Data)]),
-                    poll(Socket);  % Continua il polling
+                    poll(Socket);  
                 {error, timeout} ->
-                    poll(Socket);  % Continua il polling
+                    poll(Socket); 
                 {error, closed} ->
                     io:format("Connection closed by server.~n"),
                     exit(normal)

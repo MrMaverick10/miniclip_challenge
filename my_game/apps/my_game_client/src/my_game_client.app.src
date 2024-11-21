@@ -1,6 +1,6 @@
 {application, my_game_client, [
-    {description, "An OTP application"},
-    {vsn, "0.1.0"},
+    {description, "A client application for my_game server, designed for gamers"},
+    {vsn, "0.5.0"},
     {registered, []},
     {mod, {my_game_client, []}},
     {applications, [

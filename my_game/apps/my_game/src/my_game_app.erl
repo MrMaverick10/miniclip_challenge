@@ -5,6 +5,8 @@
          receive_name/1,handle_game_interaction/2,receive_game_action/2]).
 -define(ACTION_SELECTION,"\nAVAILABLE ACTIONS : "
                          "\n- create_room [room name] to create a room"
+                         "\n- create_private_room [room name] to create a private room"
+                         "\n- invite_user [room name] [user name] to invite a user to a private room you created"
                          "\n- list_rooms to see the available rooms"
                          "\n- join_room [room name] to join a room"
                          "\n- leave_room [room name] to leave a room"
@@ -12,7 +14,7 @@
                          "\n- send_private_message [user name] [message] to send a private message to a specific user"
                          "\n- send_message [room name] [message] to send a message to all the users in the room\n").
 
--record(room, {name, users = [], creator}).
+-record(room, {name, users = [], creator, private = false, invited_users = []}).
 
 start(_StartType, _StartArgs) ->
     io:format("My game is working!~n"),
@@ -64,9 +66,17 @@ receive_game_action(Socket, ClientName) ->
         ["create_room", RoomName] ->
             create_room(Socket, RoomName, ClientName),
             receive_game_action(Socket, ClientName);
+
+        ["create_private_room", RoomName] ->
+            create_private_room(Socket, RoomName, ClientName),
+            receive_game_action(Socket, ClientName);
+
+        ["invite_user", RoomName, TargetUser] ->
+            invite_user(Socket, RoomName, ClientName, TargetUser),
+            receive_game_action(Socket, ClientName);
         
         ["list_rooms"] ->
-            list_rooms(Socket),
+            list_rooms(Socket, ClientName),
             receive_game_action(Socket, ClientName);
 
         ["join_room", RoomName] ->
@@ -117,16 +127,67 @@ create_room(Socket, RoomName, ClientName) ->
             gen_tcp:send(Socket, "Room already exists.\n")
     end.
 
-list_rooms(Socket) ->
+create_private_room(Socket, RoomName, ClientName) ->
+    RoomKey = list_to_binary(RoomName),
+    TrimmedName = string:trim(ClientName),
+    case ets:lookup(rooms_table, RoomKey) of
+        [] ->
+            Room = #room{name = RoomName, users = [TrimmedName], creator = TrimmedName, private = true, invited_users = []},
+            ets:insert(rooms_table, {RoomKey, Room}),
+            gen_tcp:send(Socket, "Room created successfully!\n");
+        _ ->
+            gen_tcp:send(Socket, "Room already exists.\n")
+    end.
+
+invite_user(Socket, RoomName, ClientName, TargetUser) ->
+    RoomKey = list_to_binary(RoomName),
+    case ets:lookup(rooms_table, RoomKey) of
+        [{_Key, #room{name = Name, creator = Creator, private = true, invited_users = InvitedUsers} = Room}] ->
+            case ClientName =:= Creator of
+                true ->
+                    case TargetUser =:= Creator of
+                        true ->
+                            gen_tcp:send(Socket, "Error: You cannot invite yourself to the room you created.\n");
+                        false ->
+                            UpdatedRoom = Room#room{invited_users = lists:usort([TargetUser | InvitedUsers])},
+                            ets:insert(rooms_table, {RoomKey, UpdatedRoom}),
+                            gen_tcp:send(Socket, "User " ++ TargetUser ++ " has been invited to the room '" ++ Name ++ "'.\n")
+                    end;
+                false ->
+                    gen_tcp:send(Socket, "Error: Only the creator of the private room can invite users.\n")
+            end;
+        [{_Key, #room{private = false}}] ->
+            gen_tcp:send(Socket, "Error: You cannot invite users to a public room.\n");
+        [] ->
+            gen_tcp:send(Socket, "Room '" ++ RoomName ++ "' does not exist.\n")
+    end.
+
+list_rooms(Socket, ClientName) ->
     Rooms = ets:tab2list(rooms_table),
-    case Rooms of
+    
+    PublicRooms = [
+        describe_room(Room) || {_RoomName, #room{private = false} = Room} <- Rooms
+    ],
+
+    PrivateRooms = [
+        describe_room(Room) || 
+        {_RoomName, #room{private = true, users = Users} = Room} <- Rooms,
+        lists:member(ClientName, Users)
+    ],
+
+    CreatorRooms = [
+        describe_room(Room) || 
+        {_RoomName, #room{creator = Creator} = Room} <- Rooms,
+        Creator =:= ClientName
+    ],
+
+    VisibleRooms = PublicRooms ++ PrivateRooms ++ CreatorRooms,
+
+    case VisibleRooms of
         [] ->
             gen_tcp:send(Socket, "No available rooms.\n");
         _ ->
-            RoomDescriptions = [
-                describe_room(Room) || {_RoomName, Room} <- Rooms
-            ],
-            gen_tcp:send(Socket, "Available rooms:\n" ++ string:join(RoomDescriptions, "\n\n") ++ "\n")
+            gen_tcp:send(Socket, "Available rooms:\n" ++ string:join(VisibleRooms, "\n\n") ++ "\n")
     end.
 
 list_users(Socket, ClientName) ->
@@ -146,17 +207,20 @@ describe_room(#room{name = Name, users = Users, creator = Creator}) ->
 
 join_room(Socket, RoomName, ClientName) ->
     RoomKey = list_to_binary(RoomName),
-    TrimmedName = string:trim(ClientName),
     case ets:lookup(rooms_table, RoomKey) of
-        [{_Key, #room{name = Name, users = Users, creator = _} = Room}] ->
-            case lists:member(TrimmedName, Users) of
+        [{_Key, #room{name = Name, users = Users, private = true, invited_users = InvitedUsers} = Room}] ->
+            case lists:member(ClientName, Users) orelse lists:member(ClientName, InvitedUsers) of
                 true ->
-                    gen_tcp:send(Socket, "You are already in the room '" ++ Name ++ "'.\n");
-                false ->
-                    UpdatedRoom = Room#room{users = [TrimmedName | Users]},
+                    UpdatedRoom = Room#room{users = lists:usort([ClientName | Users])},
                     ets:insert(rooms_table, {RoomKey, UpdatedRoom}),
-                    gen_tcp:send(Socket, "You joined the room '" ++ Name ++ "' successfully.\n")
+                    gen_tcp:send(Socket, "You joined the private room '" ++ Name ++ "' successfully.\n");
+                false ->
+                    gen_tcp:send(Socket, "Error: You are not invited to the private room '" ++ Name ++ "'.\n")
             end;
+        [{_Key, #room{name = Name, users = Users, private = false} = Room}] ->
+            UpdatedRoom = Room#room{users = lists:usort([ClientName | Users])},
+            ets:insert(rooms_table, {RoomKey, UpdatedRoom}),
+            gen_tcp:send(Socket, "You joined the room '" ++ Name ++ "' successfully.\n");
         [] ->
             gen_tcp:send(Socket, "Room '" ++ RoomName ++ "' does not exist.\n")
     end.
@@ -202,7 +266,7 @@ send_message(Socket, RoomName, ClientName, Message) ->
         [{_Key, #room{name = Name, users = Users, creator = _}}] ->
             case lists:member(TrimmedName, Users) of
                 true ->
-                    OtherUsers = lists:delete(TrimmedName, Users),  % Exclude sender
+                    OtherUsers = lists:delete(TrimmedName, Users),
                     gen_tcp:send(Socket, "Message sent to all users in the room '" ++ Name ++ "'.\n"),
                     broadcast_message(OtherUsers, Name, TrimmedName, Message);
                 false ->

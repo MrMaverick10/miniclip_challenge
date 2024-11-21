@@ -5,14 +5,41 @@
 "My Game" is a simple client-server application written in Erlang that demonstrates basic interaction using TCP connections. The project consists of two main components:
 
 - **Server (`my_game_app`)**: Handles multiple client connections and manages user interactions such as room creation, deletion, and messaging.
-- **Client (`my_game_client`)**: Connects to the server, allowing users to interact by creating rooms, joining them, and sending public and private messages to other users.
+- **Client (`my_game_client`)**: Connects to the server, allowing users to interact by creating public and private rooms, joining them, invite user to private rooms, sending public and private messages to other users.
+
+## Changelog
+
+### [0.5.0]
+#### Added
+- Users can create private rooms.
+- Private rooms are visible only to the creator and the members.
+- Users can invite other users to their private rooms.
+
+### [0.4.0]
+#### Added
+- Users can exchange private messages with one another.
+
+### [0.3.0]
+#### Added
+- Room management:
+ - Users can create, destroy, list, join, and leave rooms.
+- Users can send broadcast messages to all members of a room they belong to.
+
+### [0.2.0]
+####Added
+- Multi-user support:
+  - Multiple users can connect to the server.
+- Users can introduce themselves upon connection.
+
+### [0.1.0]
+- First version, simple app with a welcome function and a math function
 
 ### Features
 - **Multi-client support**: The server handles multiple simultaneous connections.
 - **Room management**: Clients can create, list, delete, join, and leave chat rooms.
+- **Private rooms**: Users can create private rooms and send invitations to other users.
 - **Broadcast messaging**: Messages can be sent to all users in a room.
 - **Private messaging**: Private messages can be sent between two users.
-- **Graceful disconnection**: Clients can quit cleanly, ensuring server resources are released.
 
 ## Build, Compilation and Test Instructions
 
@@ -110,8 +137,11 @@
    [SERVER] : Hello Tommaso! You are now connected to the game!
    AVAILABLE ACTIONS :
    - create_room [room name] to create a room
+   - create_private_room [room name] to create a private room
+   - invite_user [room name] [user name] to invite a user to a private room you created
    - list_rooms to see the available rooms
    - join_room [room name] to join a room
+   - leave_room [room name] to leave a room
    - delete_room [room name] to delete a room where you are the creator
    - send_message [room name] [message] to send a message to all the active users in the room
    - send_private_message [user name] [message] to send a private message to a specific user
@@ -136,13 +166,21 @@
 ### start/0 (my_game_app)
 -This function start the server on a default port
 Example:
+```
 my_game_app:start().
+```
 Result: 
+```
 Server listening on port 4000
+```
 
 ### start/0 (my_game_client)
 -This function start the connection between a client and the server, after the presentation from the client, the server list all the available actions
 Example:
+```
 my_game_client:start(). 
+```
 Result: 
+```
 Connected to the server! Server says: Welcome in this game! Please enter your name:
+```
