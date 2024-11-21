@@ -9,6 +9,7 @@
                          "\n- join_room [room name] to join a room"
                          "\n- leave_room [room name] to leave a room"
                          "\n- delete_room [room name] to delete a room where you are the creator"
+                         "\n- send_private_message [user name] [message] to send a private message to a specific user"
                          "\n- send_message [room name] [message] to send a message to all the users in the room\n").
 
 -record(room, {name, users = [], creator}).
@@ -88,6 +89,11 @@ receive_game_action(Socket, ClientName) ->
           Message = string:join(Rest, " "),
           send_message(Socket, RoomName, ClientName, Message),
           receive_game_action(Socket, ClientName);
+
+        ["send_private_message", TargetUser | MessageRest] ->
+            Message = string:join(MessageRest, " "),
+            send_private_message(Socket, TargetUser, ClientName, Message),
+            receive_game_action(Socket, ClientName);
 
         ["quit"] -> 
             gen_tcp:send(Socket, "Goodbye!\n"),
@@ -204,6 +210,21 @@ send_message(Socket, RoomName, ClientName, Message) ->
             end;
         [] ->
             gen_tcp:send(Socket, "Room '" ++ RoomName ++ "' does not exist.\n")
+    end.
+
+send_private_message(Socket, TargetUser, Sender, Message) ->
+  case TargetUser =:= Sender of
+        true ->
+            gen_tcp:send(Socket, "Error: You cannot send a private message to yourself.\n");
+        false ->
+            case ets:lookup(active_users, TargetUser) of
+                [{_TargetUser, TargetSocket}] ->
+                    FormattedMessage = io_lib:format("[PRIVATE MESSAGE FROM ~s]: ~s\n", [Sender, Message]),
+                    gen_tcp:send(TargetSocket, lists:flatten(FormattedMessage)),
+                    gen_tcp:send(Socket, "Message sent successfully to " ++ TargetUser ++ ".\n");
+                [] ->
+                    gen_tcp:send(Socket, "User [" ++ TargetUser ++ "] is offline, the user won't read the message.\n")
+            end
     end.
 
 broadcast_message([], _RoomName, _Sender, _Message) ->
