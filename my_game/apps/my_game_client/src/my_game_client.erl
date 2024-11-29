@@ -117,7 +117,6 @@ interact_with_server(Socket, PollingPid) ->
                 gen_tcp:send(Socket, CommandStr ++ "\n"),
                 case gen_tcp:recv(Socket, 0) of
                     {ok, Response} ->
-                        % Mostra la risposta dal server senza includere il nome del client
                         io:format("[SERVER] : ~s~n", [Response]),
                         interact_with_server(Socket, PollingPid);
                     {error, closed} ->
